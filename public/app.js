@@ -12,6 +12,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const startButton = document.querySelector("#start");
   const rotateButton = document.querySelector("#rotate");
+  const setupButtons = document.getElementById("setup-buttons");
+
   const turnDisplay = document.querySelector("#whose-go");
   const infoDisplay = document.querySelector("#info");
 
@@ -28,6 +30,44 @@ document.addEventListener("DOMContentLoaded", () => {
   let allShipsPlaced = false;
   let shotFired = -1;
 
+  const shipArray = [
+    {
+      name: "destroyer",
+      directions: [
+        [0, 1],
+        [0, width],
+      ],
+    },
+    {
+      name: "submarine",
+      directions: [
+        [0, 1, 2],
+        [0, width, width * 2],
+      ],
+    },
+    {
+      name: "cruiser",
+      directions: [
+        [0, 1, 2],
+        [0, width, width * 2],
+      ],
+    },
+    {
+      name: "battleship",
+      directions: [
+        [0, 1, 2, 3],
+        [0, width, width * 2, width * 3],
+      ],
+    },
+    {
+      name: "carrier",
+      directions: [
+        [0, 1, 2, 3, 4],
+        [0, width, width * 2, width * 3, width * 4],
+      ],
+    },
+  ];
+
   function createBoard(grid, squares) {
     for (let i = 0; i < width * width; i++) {
       const square = document.createElement("div");
@@ -39,15 +79,13 @@ document.addEventListener("DOMContentLoaded", () => {
   createBoard(userGrid, userSquares);
   createBoard(computerGrid, computerSquares);
 
-  const singlePlayerButton = document.querySelector("#singlePlayerButton");
-  const multiPlayerButton = document.querySelector("#multiPlayerButton");
-
-  singlePlayerButton.addEventListener("click", startSinglePlayer);
-  multiPlayerButton.addEventListener("click", startMultiPlayer);
+  if (gameMode === "singlePlayer") {
+    startSinglePlayer();
+  } else {
+    startMultiPlayer();
+  }
 
   function startMultiPlayer() {
-    gameMode = "multiPlayer";
-
     const socket = io();
 
     socket.on("player-number", (num) => {
@@ -73,7 +111,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       playerReady(num);
 
-      if (ready) playGameMulti(socket);
+      if (ready) {
+        playGameMulti(socket);
+        setupButtons.style.display = "none";
+      }
     });
 
     socket.on("check-players", (players) => {
@@ -125,9 +166,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function playerConnectedOrDisconnected(num) {
       let player = `.p${parseInt(num) + 1}`;
 
-      document
-        .querySelector(`${player} .connected span`)
-        .classList.toggle("green");
+      document.querySelector(`${player} .connected`).classList.toggle("active");
 
       if (parseInt(num) === playerNum)
         document.querySelector(player).style.fontWeight = "bold";
@@ -135,54 +174,19 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function startSinglePlayer() {
-    gameMode = "singlePlayer";
-
     generate(shipArray[0]);
     generate(shipArray[1]);
     generate(shipArray[2]);
     generate(shipArray[3]);
     generate(shipArray[4]);
 
-    startButton.addEventListener("click", playGameSingle);
+    startButton.addEventListener("click", () => {
+      if (allShipsPlaced === true) {
+        setupButtons.style.display = "none";
+        playGameSingle();
+      }
+    });
   }
-
-  const shipArray = [
-    {
-      name: "destroyer",
-      directions: [
-        [0, 1],
-        [0, width],
-      ],
-    },
-    {
-      name: "submarine",
-      directions: [
-        [0, 1, 2],
-        [0, width, width * 2],
-      ],
-    },
-    {
-      name: "cruiser",
-      directions: [
-        [0, 1, 2],
-        [0, width, width * 2],
-      ],
-    },
-    {
-      name: "battleship",
-      directions: [
-        [0, 1, 2, 3],
-        [0, width, width * 2, width * 3],
-      ],
-    },
-    {
-      name: "carrier",
-      directions: [
-        [0, 1, 2, 3, 4],
-        [0, width, width * 2, width * 3, width * 4],
-      ],
-    },
-  ];
 
   function generate(ship) {
     let randomDirection = Math.floor(Math.random() * ship.directions.length);
@@ -306,9 +310,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (isEveryEmpty) {
         for (let i = 0; i < draggedShipLength; i++) {
+          let directionClass;
+          if (i === 0) directionClass = "start";
+          if (i === draggedShipLength - 1) directionClass = "end";
+
           userSquares[
             parseInt(this.dataset.id) - selectedShipIndex + i
-          ].classList.add("taken", shipClass);
+          ].classList.add("taken", "horizontal", directionClass, shipClass);
         }
       } else return;
     } else if (!isHorizontal && shipFirstId >= 0 && shipLastId < 100) {
@@ -320,8 +328,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (isEveryEmpty) {
         for (let i = 0; i < draggedShipLength; i++) {
+          let directionClass;
+          if (i === 0) directionClass = "start";
+          if (i === draggedShipLength - 1) directionClass = "end";
+
           userSquares[shipFirstId + width * i].classList.add(
             "taken",
+            "vertical",
+            directionClass,
             shipClass
           );
         }
@@ -336,6 +350,8 @@ document.addEventListener("DOMContentLoaded", () => {
   function dragEnd() {}
 
   function playGameMulti(socket) {
+    setupButtons.style.display = "none";
+
     if (isGameOver) return;
 
     if (!ready) {
@@ -360,7 +376,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function playerReady(num) {
     let player = `.p${parseInt(num) + 1}`;
 
-    document.querySelector(`${player} .ready span`).classList.toggle("green");
+    document.querySelector(`${player} .ready`).classList.toggle("active");
   }
 
   function playGameSingle() {
@@ -371,8 +387,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       computerSquares.forEach((square) =>
         square.addEventListener("click", function (e) {
-          shotFired = square.dataset.id;
-          revealSquare(square.classList);
+          if (!isGameOver) {
+            shotFired = square.dataset.id;
+            revealSquare(square.classList);
+          }
         })
       );
     }
@@ -429,8 +447,11 @@ document.addEventListener("DOMContentLoaded", () => {
   function enemyGo(square) {
     if (gameMode === "singlePlayer")
       square = Math.floor(Math.random() * userSquares.length);
+
     if (!userSquares[square].classList.contains("boom")) {
-      userSquares[square].classList.add("boom");
+      const hit = userSquares[square].classList.contains("taken");
+
+      userSquares[square].classList.add(hit ? "boom" : "miss");
 
       if (userSquares[square].classList.contains("destroyer"))
         cpuDestroyerCount++;
